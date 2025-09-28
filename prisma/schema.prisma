@@ -1,0 +1,54 @@
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations for whistleblowing reports
+  reports   Report[]
+
+  @@map("users")
+}
+
+model Report {
+  id          Int          @id @default(autoincrement())
+  title       String
+  description String
+  category    String
+  status      ReportStatus @default(PENDING)
+  isAnonymous Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  reporterId Int?
+  reporter   User? @relation(fields: [reporterId], references: [id])
+
+  @@map("reports")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  INVESTIGATOR
+}
+
+enum ReportStatus {
+  PENDING
+  UNDER_INVESTIGATION
+  RESOLVED
+  REJECTED
+}
