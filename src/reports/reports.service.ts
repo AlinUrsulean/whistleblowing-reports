@@ -2,13 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { CreateReportDto } from './dto/create-report.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 @Injectable()
 export class ReportsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsGateway: NotificationsGateway,
+  ) {}
 
   async create(createReportDto: CreateReportDto) {
-    return this.prisma.report.create({
+    const report = await this.prisma.report.create({
       data: {
         title: createReportDto.title,
         description: createReportDto.description,
@@ -17,15 +21,53 @@ export class ReportsService {
         reporterId: createReportDto.reporterId,
       },
       include: {
-        reporter: true,
+        reporter: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+          },
+        },
       },
     });
+
+    // Send notification to admins and investigators
+    this.notificationsGateway.sendNotificationToRoles(['ADMIN', 'INVESTIGATOR'], {
+      type: 'NEW_REPORT',
+      message: `New report created: ${report.title}`,
+      reportId: report.id,
+      timestamp: new Date(),
+    });
+
+    return report;
   }
 
-  async findAll() {
+  async findAll(status?: string, category?: string) {
+    const where: any = {};
+    
+    if (status) {
+      where.status = status;
+    }
+    
+    if (category) {
+      where.category = category;
+    }
+
     return this.prisma.report.findMany({
+      where,
       include: {
-        reporter: true,
+        reporter: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
   }
